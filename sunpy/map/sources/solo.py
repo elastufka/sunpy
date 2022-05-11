@@ -10,7 +10,7 @@ from sunpy.map import GenericMap
 from sunpy.map.sources.source_type import source_stretch
 from sunpy.time import parse_time
 
-__all__ = ['EUIMap']
+__all__ = ['EUIMap','STIXMap']
 
 
 class EUIMap(GenericMap):
@@ -74,3 +74,53 @@ class EUIMap(GenericMap):
         is_solo = 'solar orbiter' in str(header.get('obsrvtry', '')).lower()
         is_eui = str(header.get('instrume', '')).startswith('EUI')
         return is_solo and is_eui
+
+class STIXMap(GenericMap):
+    """
+    STIX reconstructed image Map
+
+    The Spectrometer/Telescope for Imaging X-Rays (STIX) is a remote sensing instrument onboard the
+    Solar Orbiter (SolO) spacecraft.
+    
+    All STIX images are reconstructed from visibilities, using various algorithms:
+    - Back Projection
+    - Forward Fit
+    - Expectation Maximization
+    - CLEAN
+    
+    (more about imaging)
+
+    References
+    ----------
+    * `Solar Orbiter Mission Page <https://sci.esa.int/web/solar-orbiter/>`__
+    * `STIX Data Center
+        <https://sci.esa.int/web/solar-orbiter/>`__
+    * `STIX Instrument Page <https://wwwbis.sidc.be/EUI/EUI/EUI/EUI/EUI/>`__
+    * `Instrument Paper <https://doi.org/10.1051/0004-6361/201936663>`__
+    """
+    
+    def __init__(self, data, header, **kwargs):
+        super().__init__(data, header, **kwargs)
+        self._nickname = "STIX"
+        
+    @property
+    def _supported_observer_coordinates(self):
+        """
+        A list of supported coordinate systems.
+        This is a list so it can easily maintain a strict order. The list of
+        two element tuples, the first item in the tuple is the keys that need
+        to be in the header to use this coordinate system and the second is the
+        kwargs to SkyCoord.
+        """
+        return [(('hgln_obs', 'hglt_obs', 'dsun_obs'), {'lon': self.meta.get('hgln_obs'),
+                                                        'lat': self.meta.get('hglt_obs'),
+                                                        'radius': self.meta.get('dsun_obs'),
+                                                        'unit': (u.deg, u.deg, u.m),
+                                                        'frame': "heliographic_stonyhurst"})]
+
+    @classmethod
+    def is_datasource_for(cls, data, header, **kwargs):
+        """Determines if header corresponds to an STIX image"""
+        #is_solo = True #'solar orbiter' in str(header.get('obsrvtry', '')).lower()
+        is_stix = str(header.get('telescop', '')).startswith('STIX') #EUI usens instrume
+        return is_stix
