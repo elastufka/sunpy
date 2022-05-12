@@ -38,7 +38,7 @@ import sunpy.io as io
 import sunpy.io._fits
 import sunpy.visualization.colormaps
 from sunpy import config, log
-from sunpy.coordinates import HeliographicCarrington, get_earth, sun
+from sunpy.coordinates import HeliographicCarrington, get_earth, sun, wcs_utils
 from sunpy.coordinates.utils import get_rectangle_coordinates
 from sunpy.image.resample import resample as sunpy_image_resample
 from sunpy.image.resample import reshape_image_to_4d_superpixel
