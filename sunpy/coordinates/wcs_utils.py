@@ -258,6 +258,19 @@ def solar_frame_to_wcs_mapping(frame, projection='TAN'):
 
     return wcs
 
+def reference_coordinate_from_frame(frame):
+    """
+    For a given frame, construct a reference coordinate
+
+    Parameters
+    ----------
+    frame : astropy.coordinates.BaseCoordinateFrame
+
+    Returns
+    -------
+    SkyCoord
+    """
+    return SkyCoord(0*u.arcsec,0*u.arcsec,frame=frame)
 
 astropy.wcs.utils.WCS_FRAME_MAPPINGS.append([solar_wcs_frame_mapping])
 astropy.wcs.utils.FRAME_WCS_MAPPINGS.append([solar_frame_to_wcs_mapping])

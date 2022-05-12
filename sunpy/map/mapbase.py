@@ -2652,7 +2652,7 @@ class GenericMap(NDData):
 
         return axes
 
-    def reproject_to(self, target_wcs, target_observer=False,algorithm='interpolation', return_footprint=False,cutout=False,
+    def reproject_to(self, target_wcs,algorithm='interpolation', return_footprint=False,
                      **reproject_args):
         """
         Reproject the map to a different world coordinate system (WCS)
@@ -2703,14 +2703,12 @@ class GenericMap(NDData):
         except ImportError as exc:
             raise ImportError("This method requires the optional package `reproject`.") from exc
 
-        if not sunpy.map.contains_full_disk(self) and cutout: #reproject submap faster
-            print("Reprojecting cutout")
-            if not isinstance(target_wcs, astropy.wcs.WCS):
-                target_wcs = astropy.wcs.WCS(target_wcs)
-            #set crpix to 0,0 and naxis to 1,1
-            target_observer=target_observer
-            print(f"{target_wcs}\n{target_observer}")
-            #target_frame=wcs_utils.solar_wcs_frame_mapping(target_wcs)
+        if not isinstance(target_wcs, astropy.wcs.WCS):
+            target_wcs = astropy.wcs.WCS(target_wcs)
+            target_header=target_wcs.to_header()
+
+        if not sunpy.map.contains_full_disk(self): #reproject submap faster
+            target_observer=wcs_utils.reference_coordinate_from_frame(wcs_utils.solar_wcs_frame_mapping(target_wcs)) #must be SkyCoord ie reference coordinate
             edges_pix = np.concatenate(sunpy.map.map_edges(self))
             edges_coord = self.pixel_to_world(edges_pix[:, 0], edges_pix[:, 1])
             new_edges_coord = edges_coord.transform_to(target_observer)
@@ -2722,39 +2720,20 @@ class GenericMap(NDData):
                  on_disk=sunpy.map.coordinate_is_on_solar_disk(cc)
                  on_disk_coordinates=cc[on_disk]
                  nan_percent=1.-len(on_disk_coordinates)/len(cc.flatten())
-                 self.nan_percent_rotated=nan_percent*100
                  if nan_percent > 0.5:
-                     print(f"Warning - {nan_percent*100:.1f}% of pixels in reprojected map are NaN!")
+                     warn_user(f"{nan_percent*100:.1f}% of pixels in reprojected map are NaN!")
 
             # Determine the extent needed - use of nanmax/nanmin means only on-disk coords are considered
             left, right = np.nanmin(new_edges_xpix), np.nanmax(new_edges_xpix)
             bottom, top = np.nanmin(new_edges_ypix), np.nanmax(new_edges_ypix)
-            print(left,right,bottom,top)
+
             # Adjust the CRPIX and NAXIS values
-            modified_header = sunpy.map.make_fitswcs_header((1, 1), target_observer,scale=None)
-            print(modified_header)
-            modified_header['crpix1'] -= left
-            modified_header['crpix2'] -= bottom
-            modified_header['naxis1'] = int(np.ceil(right - left))
-            modified_header['naxis2'] = int(np.ceil(top - bottom))
-            if modified_header['cunit1'] == modified_header['cunit2'] == 'deg':
-                newcdelt1=(modified_header['cdelt1']*u.deg).to(u.arcsec).value
-                newcdelt2=(modified_header['cdelt2']*u.deg).to(u.arcsec).value
-                for k,v in zip(['cdelt1','cdelt2','cunit1','cunit2'],[newcdelt1,newcdelt2,'arcsec','arcsec']):
-                    modified_header[k]=v
-#            target_wcs=modified_header
-#            #add back other keywords
-#            for key,value in self.meta.items():
-#                if key not in target_wcs.keys() and not isinstance(value,dict):
-#                    target_wcs[key]=value
-            target_header=modified_header
-            target_wcs=modified_header
-            #target_wcs.heliographic_observer=target_observer
-            
-        if not isinstance(target_wcs, astropy.wcs.WCS):
-            target_wcs = astropy.wcs.WCS(target_wcs)
-        if not cutout:
-            target_header=target_wcs.to_header()
+            target_header = sunpy.map.make_fitswcs_header((1, 1), target_observer) #scale?
+            target_header['crpix1'] -= left
+            target_header['crpix2'] -= bottom
+            target_header['naxis1'] = int(np.ceil(right - left))
+            target_header['naxis2'] = int(np.ceil(top - bottom))
+            target_wcs=astropy.wcs.WCS(target_header)
 
         # Select the desired reprojection algorithm
         functions = {'interpolation': reproject.reproject_interp,
@@ -2763,7 +2742,6 @@ class GenericMap(NDData):
         if algorithm not in functions:
             raise ValueError(f"The specified algorithm must be one of: {list(functions.keys())}")
         func = functions[algorithm]
-
             
         # reproject does not automatically grab the array shape from the WCS instance
         if target_wcs.array_shape is not None:
